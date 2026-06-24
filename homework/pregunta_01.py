@@ -73,4 +73,4 @@ def pregunta_01():
 
     df = pd.DataFrame(data)
     output_file = os.path.join(output_dir, "solicitudes_de_credito.csv")
-    df.to_csv(output_file, index=False)
+    df.to_csv(output_file, index=True, sep=";")
