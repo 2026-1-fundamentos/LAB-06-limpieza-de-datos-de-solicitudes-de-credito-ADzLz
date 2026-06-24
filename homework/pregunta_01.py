@@ -16,6 +16,7 @@ def pregunta_01():
     import glob
     import os
     import pandas as pd
+    import unicodedata
 
     input_dir = "files/input"
     output_dir = "files/output"
@@ -39,7 +40,15 @@ def pregunta_01():
         "barrio",
         "línea_credito",
     ]
-
+    def eliminar_acentos(texto):
+        texto = str(texto)
+        # Convertir a formato Unicode descompuesto para separar letras de tildes
+        texto = (
+            unicodedata.normalize("NFKD", texto)
+            .encode("ascii", "ignore")
+            .decode("utf-8")
+        )
+        return texto
     # 3. Limpiar Columnas de Texto (Homogeneización estricta)
     for col in columnas_texto:
         if col in data.columns:
@@ -48,6 +57,7 @@ def pregunta_01():
                 .astype(str)
                 .str.lower()
                 .str.strip()
+                .apply(eliminar_acentos)
                 .str.replace("_", " ", regex=False)
                 .str.replace("-", " ", regex=False)
                 # CORRECCIÓN: Colapsar espacios múltiples internos en uno solo
@@ -101,3 +111,4 @@ def pregunta_01():
     # 8. Guardar el archivo limpio (index=False es obligatorio)
     output_file = os.path.join(output_dir, "solicitudes_de_credito.csv")
     data.to_csv(output_file, index=False, sep=";")
+pregunta_01()
