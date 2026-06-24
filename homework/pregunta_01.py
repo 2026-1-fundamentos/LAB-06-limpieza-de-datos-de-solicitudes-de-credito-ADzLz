@@ -22,55 +22,82 @@ def pregunta_01():
     os.makedirs(output_dir, exist_ok=True)
 
     
-    data = pd.read_csv(os.path.join(input_dir, "solicitudes_de_credito.csv"),sep=";", index_col=0)
+    data = pd.read_csv(
+        os.path.join(input_dir, "solicitudes_de_credito.csv"),
+        sep=";",
+        index_col=0,
+    )
 
-    columnas_numericas = ['estrato','comuna_ciudadano','monto_del_credito']
-    columnas_fechas = ["fecha_de_beneficio", "fecha_registro"]
-    columnas_texto = ["sexo", 'tipo_de_emprendimiento', 'idea_negocio', 'barrio','línea_credito']
+    # 2. Eliminar nulos iniciales de la base
+    data.dropna(inplace=True)
 
-    # for col in columnas_numericas:
-    #     valores_invalidos= []
-    #     valores_invalidos = data[pd.to_numeric(data[col], errors='coerce').isna()][col].unique().tolist()
+    columnas_numericas = ["estrato", "comuna_ciudadano", "monto_del_credito"]
+    columnas_texto = [
+        "sexo",
+        "tipo_de_emprendimiento",
+        "idea_negocio",
+        "barrio",
+        "línea_credito",
+    ]
 
-    #     print(f"Valores extraños detectados en {col}: {valores_invalidos}")
-    for col in columnas_numericas:
-        if col in data.columns:
-            if col == "monto_del_credito":
-                data[col] = (data[col].str.lower().str.strip()
-                                .str.replace("$ ", "", regex=False)
-                                .str.replace(".00", "", regex=False)
-                                .str.replace(",", "", regex=False)
-                                .str.replace(".", "", regex=False))
-            data[col] = pd.to_numeric(data[col]).astype("Int64", errors='ignore')
-
-    # for col in columnas_numericas:
-    #     valores_invalidos= []
-    #     valores_invalidos = data[pd.to_numeric(data[col], errors='coerce').isna()][col].unique().tolist()
-
-    #     print(f"Valores extraños detectados en {col}: {valores_invalidos}")
-
-
-    for col in columnas_fechas:
-        if col in data.columns:
-            data[col] = pd.to_datetime(data[col], errors='coerce', format='mixed')
-
+    # 3. Limpiar Columnas de Texto (Homogeneización estricta)
     for col in columnas_texto:
         if col in data.columns:
-            data[col] = (data[col].str.lower().str.strip()
-                            .str.replace("_", " ", regex=False)
-                            .str.replace("-", " ", regex=False))
-            data[col] = data[col].replace(["nan", "none", "null", "unknown", ""], pd.NA)
+            data[col] = (
+                data[col]
+                .astype(str)
+                .str.lower()
+                .str.strip()
+                .str.replace("_", " ", regex=False)
+                .str.replace("-", " ", regex=False)
+                # CORRECCIÓN: Colapsar espacios múltiples internos en uno solo
+                .str.replace(r"\s+", " ", regex=True)
+                .str.strip()
+            )
 
+    # 4. Limpiar columna de fecha minuciosamente
+    if "fecha_de_beneficio" in data.columns:
 
-    data["línea_credito"] = (data["línea_credito"].str.lower().str.strip()
-                             .str.replace("_", " ", regex=False)
-                             .str.replace("-", " ", regex=False))
+        def limpiar_fecha(x):
+            parts = str(x).strip().split("/")
+            if len(parts) == 3:
+                if len(parts[0]) == 4:  # YYYY/MM/DD
+                    return f"{parts[0]}-{parts[1].zfill(2)}-{parts[2].zfill(2)}"
+                if len(parts[2]) == 4:  # DD/MM/YYYY
+                    return f"{parts[2]}-{parts[1].zfill(2)}-{parts[0].zfill(2)}"
+            return x
 
-    data = data.drop_duplicates()
-    data = data.dropna()
+        data["fecha_de_beneficio"] = data["fecha_de_beneficio"].apply(
+            limpiar_fecha
+        )
 
+    # 5. Limpiar Columnas Numéricas matemáticamente
+    if "monto_del_credito" in data.columns:
+        data["monto_del_credito"] = (
+            data["monto_del_credito"]
+            .astype(str)
+            .str.strip()
+            .str.replace("$", "", regex=False)
+            .str.replace(",", "", regex=False)
+            .str.strip()
+        )
 
+    # Convertir numéricos de manera segura con coerción nativa de tipos
+    for col in columnas_numericas:
+        if col in data.columns:
+            data[col] = pd.to_numeric(data[col], errors="coerce")
 
-    df = pd.DataFrame(data)
+    # 6. Eliminar nulos generados por la conversión y forzar enteros
+    data.dropna(inplace=True)
+    for col in columnas_numericas:
+        data[col] = data[col].astype(int)
+
+    # 7. Remover duplicados finales sobre la matriz completamente limpia
+    data.drop_duplicates(inplace=True)
+    for col in data.columns:
+
+        print(f"Valores en {col}: {data[col].value_counts().to_list()}")
+
+    # 8. Guardar el archivo limpio (index=False es obligatorio)
     output_file = os.path.join(output_dir, "solicitudes_de_credito.csv")
-    df.to_csv(output_file, index=True, sep=";")
+    data.to_csv(output_file, index=False, sep=";")
