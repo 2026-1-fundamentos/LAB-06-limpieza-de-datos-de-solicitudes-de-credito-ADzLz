@@ -46,29 +46,35 @@ def pregunta_01():
     # 3. Limpieza de columnas de texto
     for col in columnas_texto:
         if col in data.columns:
-            # Forzar conversión a string y minúsculas primero
-            data[col] = data[col].astype(str).str.lower().str.strip()
-            
-            # Corrección explícita de caracteres corruptos identificados en Power BI
             if col == "barrio":
+                # Limpieza para BARRIO (SIN eliminar acentos/tildes ni eñes)
                 data[col] = (
                     data[col]
-                    .str.replace("antonio nario", "antonio narino", regex=False)
-                    .str.replace("beln", "belen", regex=False)
+                    .astype(str)
+                    .str.lower()
+                    # Corregir los caracteres corruptos manteniendo la eñe y la tilde originales
+                    .str.replace("antonio nari¿o", "antonio nariño", regex=False)
+                    .str.replace("bel¿n", "belén", regex=False)
+                    # Unificar guiones por espacios (el punto NO se toca)
+                    .str.replace("_", " ", regex=False)
+                    .str.replace("-", " ", regex=False)
+                    # Colapsar espacios múltiples intermedios
+                    .str.replace(r"\s+", " ", regex=True)
+                    .str.strip()
                 )
-            
-            # Limpieza homogénea general para todas las columnas de texto
-            data[col] = (
-                data[col]
-                .apply(eliminar_acentos)
-                # Reemplazar guiones bajos y medios por espacios (el punto NO se toca)
-                .str.replace("_", " ", regex=False)
-                .str.replace("-", " ", regex=False)
-                # Colapsar múltiples espacios intermedios
-                .str.replace(r"\s+", " ", regex=True)
-                .str.strip()
-            )
-
+            else:
+                # Limpieza estándar para las demás columnas de texto (CON eliminación de acentos)
+                data[col] = (
+                    data[col]
+                    .astype(str)
+                    .str.lower()
+                    # Unificar guiones por espacios
+                    .str.replace("_", " ", regex=False)
+                    .str.replace("-", " ", regex=False)
+                    # Colapsar espacios múltiples intermedios
+                    .str.replace(r"\s+", " ", regex=True)
+                    .str.strip()
+                )
     # 4. Homogeneizar fechas a formato YYYY-MM-DD
     if "fecha_de_beneficio" in data.columns:
 
@@ -110,8 +116,12 @@ def pregunta_01():
 
     # 7. Remover registros duplicados sobre la matriz limpia
     data.drop_duplicates(inplace=True)
-    for col in data.columns:print(f"Valores en {col}: {data[col].value_counts().to_list()}")
+
+
+    for col in data.columns:
+        print(f'{col}: {data[col].value_counts().to_list()}')
     # 8. Guardar el archivo limpio sin el índice de pandas
     output_file = os.path.join(output_dir, "solicitudes_de_credito.csv")
     data.to_csv(output_file, index=False, sep=";")
+    data["barrio"].value_counts().to_csv(os.path.join(output_dir, "barrio_counts.csv"), header=False, sep=";")
 pregunta_01()
