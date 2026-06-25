@@ -46,19 +46,25 @@ def pregunta_01():
     # 3. Limpieza de columnas de texto
     for col in columnas_texto:
         if col in data.columns:
+            # Forzar conversión a string y minúsculas primero
+            data[col] = data[col].astype(str).str.lower().str.strip()
+            
+            # Corrección explícita de caracteres corruptos identificados en Power BI
+            if col == "barrio":
+                data[col] = (
+                    data[col]
+                    .str.replace("antonio nario", "antonio narino", regex=False)
+                    .str.replace("beln", "belen", regex=False)
+                )
+            
+            # Limpieza homogénea general para todas las columnas de texto
             data[col] = (
                 data[col]
-                .astype(str)
-                # CORRECCIÓN DE ENCODING: Corregir el carácter dañado antes de limpiar
-                .str.lower()
-                .str.replace("antonio nari¿o", "antonio narino", regex=False)
-                .str.replace("bel¿n", "belen", regex=False)
-                .str.strip()
                 .apply(eliminar_acentos)
-                # Unificar guiones por espacios tal como viste en Power BI
+                # Reemplazar guiones bajos y medios por espacios (el punto NO se toca)
                 .str.replace("_", " ", regex=False)
                 .str.replace("-", " ", regex=False)
-                # Colapsar espacios múltiples intermedios
+                # Colapsar múltiples espacios intermedios
                 .str.replace(r"\s+", " ", regex=True)
                 .str.strip()
             )
@@ -104,6 +110,8 @@ def pregunta_01():
 
     # 7. Remover registros duplicados sobre la matriz limpia
     data.drop_duplicates(inplace=True)
+    for col in data.columns:print(f"Valores en {col}: {data[col].value_counts().to_list()}")
     # 8. Guardar el archivo limpio sin el índice de pandas
     output_file = os.path.join(output_dir, "solicitudes_de_credito.csv")
     data.to_csv(output_file, index=False, sep=";")
+pregunta_01()
